@@ -322,7 +322,7 @@ function cl(s){return String(s==null?"":s).replace(/^\s+|\s+$/g,"")} /* 칸 앞�
 
 /* 시트의 탭 하나를 읽어 옵니다. 실패하면 오류를 냅니다 — 수정 금지 */
 function fetchTab(name){
- var url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(name);
+ var url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&headers=1&sheet="+encodeURIComponent(name); /* headers=1 : 맨 윗줄 1줄만 제목 줄로 보라는 뜻. 이게 없으면 구글이 글자로만 된 윗부분 여러 줄을 제목으로 합쳐 버려 내용이 읽히지 않습니다 — 수정 금지 */
  var req=fetch(url,{cache:"no-store"}).then(function(r){
   if(!r.ok)throw new Error("HTTP "+r.status);
   return r.text();
