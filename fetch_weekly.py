@@ -48,10 +48,12 @@ WEEKLY_DIR = os.path.join(ROOT, "weekly")
 IMG_DIR = os.path.join(WEEKLY_DIR, "img")
 DATA_JSON = os.path.join(WEEKLY_DIR, "data.json")
 
-HEADERS = {  # 웹진 서버가 사람이 쓰는 브라우저로 알아보게 하는 설정
-    "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
-    "Accept-Language": "ko-KR,ko;q=0.9",
+HEADERS = {  # 웹진 서버가 사람이 쓰는 브라우저로 알아보게 하는 설정 (컴퓨터용 크롬으로 접속)
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.5",
 }
+MOBILE_UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"  # 컴퓨터용으로 안 될 때 휴대폰용으로도 시도
 
 
 def log(msg):
@@ -116,6 +118,13 @@ def find_pages(html):
     found = {}
     for idx, url in re.findall(r"listImageArray\[(\d+)\]\s*=\s*['\"]([^'\"]+)['\"]", html):
         found[int(idx)] = url.strip()
+    if not found:   # 위 방법이 안 되면 'saveDir/webzine/호/p숫자.jpg' 모양의 주소를 모두 찾아 순서대로 사용
+        loose = re.findall(r"https?://[^\s'\"<>)]+/saveDir/webzine/[^\s'\"<>)]+?\.(?:jpg|jpeg|png)", html, re.I)
+        seen = []
+        for u in loose:
+            if u not in seen:
+                seen.append(u)
+        return seen
     return [found[k] for k in sorted(found)]
 
 
@@ -176,7 +185,18 @@ def main():
     page_url = WEBZINE_BASE.rstrip("/") + "/" + number
     log("웹진 페이지 읽는 중: %s" % page_url)
     try:
-        html = http_get(page_url).text
+        resp = http_get(page_url)
+        html = resp.text
+        if not find_pages(html):   # 컴퓨터용으로 목록이 없으면 휴대폰용 신분으로 한 번 더
+            log("  컴퓨터용 접속에서 목록 없음 → 휴대폰용으로 다시 시도")
+            r2 = requests.get(page_url, headers=dict(HEADERS, **{"User-Agent": MOBILE_UA}), timeout=HTTP_TIMEOUT)
+            if find_pages(r2.text):
+                resp, html = r2, r2.text
+        if not find_pages(html):   # 그래도 없으면 원인 파악용으로 받은 내용을 보여 줌
+            log("  [진단] 최종 주소: %s / 상태: %s / 글자 수: %d" % (resp.url, resp.status_code, len(html)))
+            log("  [진단] 응답 헤더: %s" % dict(list(resp.headers.items())[:8]))
+            log("  [진단] 내용 앞부분: %s" % re.sub(r"\s+", " ", html[:800]))
+            log("  [진단] 'listImageArray' 글자 포함 여부: %s" % ("listImageArray" in html))
     except RuntimeError as e:
         if "HTTP 404" in str(e):   # 번호는 바꿨는데 웹진에 아직 안 올라온 경우
             log("아직 웹진에 %s호가 올라오지 않았습니다. 기존 사본을 그대로 둡니다. (%s)" % (number, e))
