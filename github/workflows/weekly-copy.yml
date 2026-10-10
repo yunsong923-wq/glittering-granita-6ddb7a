@@ -1,0 +1,68 @@
+# 주간충현 사본 자동 만들기 (GitHub 서버가 알아서 실행합니다)
+# =====================================================================
+# 언제 실행되나요?
+#   · 하루 4번(한국 시간 새벽 3시·9시·오후 3시·밤 9시) 자동 실행됩니다.
+#     구글 시트의 '주간충현 번호'가 바뀌면 그때 새 호를 받아 오고,
+#     번호가 그대로면 아무것도 하지 않고 20초 안에 끝납니다.
+#   · 급할 때는 직접 실행할 수 있습니다:
+#     GitHub 저장소 → 위쪽 Actions → 왼쪽 '주간충현 사본 만들기' → 오른쪽 'Run workflow' 버튼
+# 결과
+#   · 받은 이미지가 weekly 폴더에 저장되고, Netlify가 자동으로 다시 게시합니다. (1~2분)
+# =====================================================================
+name: 주간충현 사본 만들기
+
+on:
+  schedule:
+    # 시각은 세계 표준시(UTC)입니다. 한국 시간 = UTC + 9시간.  18:00 UTC = 한국 03:00
+    - cron: "0 18,0,6,12 * * *"
+  workflow_dispatch:           # 'Run workflow' 버튼으로 직접 실행하는 기능
+    inputs:
+      number:
+        description: "번호를 직접 지정하려면 입력 (비워 두면 구글 시트의 번호 사용)"
+        required: false
+        default: ""
+      force:
+        description: "이미 받은 호도 다시 받으려면 yes 입력"
+        required: false
+        default: ""
+
+permissions:
+  contents: write              # 받은 이미지를 저장소에 저장하려면 필요한 권한 — 수정 금지
+
+concurrency:                   # 두 번 동시에 실행되지 않게 하는 설정 — 수정 금지
+  group: weekly-copy
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 저장소 내려받기
+        uses: actions/checkout@v4
+
+      - name: 파이썬 준비
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 필요한 도구 설치
+        run: pip install requests pillow
+
+      - name: 주간충현 받기
+        env:
+          WEEKLY_NUMBER: ${{ github.event.inputs.number }}
+          FORCE: ${{ github.event.inputs.force }}
+        run: python tools/fetch_weekly.py
+
+      - name: 바뀐 파일이 있으면 저장
+        run: |
+          git config user.name "weekly-bot"
+          git config user.email "weekly-bot@users.noreply.github.com"
+          git add weekly
+          if git diff --cached --quiet; then
+            echo "바뀐 내용 없음"
+          else
+            git commit -m "주간충현 사본 갱신"
+            git push
+          fi
