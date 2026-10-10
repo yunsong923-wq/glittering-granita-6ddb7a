@@ -71,6 +71,7 @@ header h2{margin:0;font-size:19px;font-weight:700} /* 제목 글자 크기(19px)
 .ib:focus-visible,.big:focus-visible,.top:focus-visible{outline:3px solid #0a58ca;outline-offset:2px} /* 키보드로 선택했을 때 보이는 파란 테두리 (수정 금지) */
 .ib svg{width:30px;height:30px;fill:#6b6b6b} /* 홈/화살표 아이콘 크기(30px)와 색(회색 #6b6b6b) */
 .ib.sp{visibility:hidden} /* 제목을 가운데 놓기 위한 빈 자리 (수정 금지) */
+.gp{display:flex;align-items:center;gap:10px} /* ★ 왼쪽·오른쪽 화살표 두 개를 한 묶음으로 보는 칸. gap 이 두 화살표 사이 간격(10px)입니다 — 실수로 잘못 누르는 일이 잦으면 숫자를 더 키우세요 */
 .logo{cursor:default}.logo img{height:38px;width:auto;display:block} /* 로고 높이(38px). 로고를 키우려면 숫자를 올리세요 */
 .gap{margin-left:3em} /* 말씀 문구 두 줄 사이의 간격 */
 
@@ -496,12 +497,21 @@ var UP='<svg viewBox="0 0 24 24"><path d="m12 6-8 8 2 2 6-6 6 6 2-2z"/></svg>';
 function esc(s){return String(s).replace(/[&<>]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;"}[c]})}
 
 /* 각 화면 맨 위 노란 줄(왼쪽 홈 버튼 + 제목 + 오른쪽 화살표)을 만듭니다 — 수정 금지.
-   '환우 명단'만 오른쪽 화살표가 반대(뒤로가기)입니다. */
+   · '교회 소식' : 오른쪽에 ▶(다음) 하나
+   · '교구 소식' : 오른쪽에 ◀(이전)와 ▶(다음) 두 개 — 두 버튼 사이는 .gp 의 gap 만큼 떨어져 있습니다
+   · '환우 명단' : 오른쪽에 ◀(이전) 하나 */
 function head(name){
- var i=ORDER.indexOf(name),right=name==="patients"
-  ?'<button class="ib" data-go="'+ORDER[i-1]+'" aria-label="이전 화면">'+BACK+'</button>'
-  :'<button class="ib" data-go="'+ORDER[i+1]+'" aria-label="다음 화면">'+NEXT+'</button>';
- return '<header><button class="ib" data-go="home" aria-label="홈">'+HOME+'</button><h2>'+TITLES[name]+'</h2>'+right+'</header>';
+ var i=ORDER.indexOf(name);
+ var prev='<button class="ib" data-go="'+ORDER[i-1]+'" aria-label="이전 화면">'+BACK+'</button>'; /* ◀ 이전 화면으로 */
+ var next='<button class="ib" data-go="'+ORDER[i+1]+'" aria-label="다음 화면">'+NEXT+'</button>'; /* ▶ 다음 화면으로 */
+ var left='<button class="ib" data-go="home" aria-label="홈">'+HOME+'</button>'; /* 맨 왼쪽 집 모양(홈) */
+ var right;
+ if(name==="parish"){
+  right='<span class="gp">'+prev+next+'</span>'; /* 두 화살표를 묶음으로 */
+  left='<span class="gp">'+left+'<span class="ib sp"></span></span>'; /* 왼쪽에도 보이지 않는 빈 자리를 같은 폭으로 두어 제목이 가운데에 오게 함 */
+ }else if(name==="patients"){right=prev}
+ else{right=next}
+ return '<header>'+left+'<h2>'+TITLES[name]+'</h2>'+right+'</header>';
 }
 
 /* 화면 맨 아래의 '맨 위로' 버튼을 만듭니다 — 수정 금지 */
