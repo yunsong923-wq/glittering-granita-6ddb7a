@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"> <!-- 휴대폰 화면 너비에 맞추는 설정. 손가락으로 확대(핀치 줌)도 가능합니다 — 수정 금지 -->
+<title>주간충현</title>
+<!--
+=====================================================================
+ 주간충현 보기 화면 (weekly/index.html)
+---------------------------------------------------------------------
+ · 이 파일은 거의 고칠 일이 없습니다. 쪽 이미지와 호 정보는 자동 프로그램이
+   weekly/data.json 과 weekly/img/ 에 저장하고, 이 화면이 그것을 읽어 보여 줍니다.
+ · 소식지 홈 화면의 '주간충현' 버튼을 누르면 이 화면이 열립니다.
+=====================================================================
+-->
+<style>
+/* ▼ 색깔 모음: # 뒤의 번호만 바꾸면 색이 바뀝니다 */
+:root{
+ --bar:#2b4db8;      /* 위쪽 파란 띠 색 (소식지의 주간충현 버튼과 같은 색) */
+ --barText:#ffffff;  /* 위쪽 띠의 글자색 */
+ --bg:#e9ebf0;       /* 화면 배경색 */
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);font-family:-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bar);color:var(--barText)} /* 위쪽 띠: 스크롤해도 따라다님 */
+.bar a{color:var(--barText);text-decoration:none;font-size:15px;font-weight:700;white-space:nowrap}
+.bar .t{flex:1;min-width:0;font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center} /* 호 제목 글자 */
+.wrap{max-width:900px;margin:0 auto;padding:8px 0 80px} /* 이미지가 놓이는 영역. max-width 는 큰 화면에서의 최대 너비 */
+.pg{display:block;width:100%;height:auto;background:#fff;margin:0 0 8px} /* 쪽 이미지: 화면 너비에 꽉 차게 */
+.cap{font-size:12px;color:#667;text-align:right;padding:0 12px 4px} /* 이미지 위 '1 / 8쪽' 글자 */
+.msg{padding:48px 20px;text-align:center;color:#334;font-size:16px;line-height:1.7} /* 안내 문구(불러오는 중, 준비 중) */
+.msg a{color:var(--bar);font-weight:700}
+.sub{padding:6px 12px;font-size:12px;color:#667;text-align:center} /* 맨 아래 '갱신 시각' 글자 */
+.top{position:fixed;right:14px;bottom:18px;width:46px;height:46px;border-radius:50%;border:0;background:var(--bar);color:#fff;font-size:20px;opacity:.88;display:none} /* 맨 위로 가는 둥근 버튼 */
+</style>
+</head>
+<body>
+<div class="bar">
+ <a href="../">‹ 홈</a> <!-- 소식지 첫 화면으로 돌아가는 링크. 글자는 여기서 바꿉니다 -->
+ <div class="t" id="title">주간충현</div>
+ <a href="http://webzine.choonghyunchurch.or.kr/" id="orig" target="_blank" rel="noopener">원본</a> <!-- 충현교회 원본 웹진으로 가는 링크 (느립니다). 평소엔 쓸 일이 없습니다 -->
+</div>
+<div class="wrap" id="wrap"><div class="msg">불러오는 중입니다…</div></div>
+<button class="top" id="top" aria-label="맨 위로">▲</button>
+
+<script>
+/* =====================================================================
+   아래는 화면을 만드는 프로그램입니다. 글자(안내 문구)를 바꿀 때만 고치세요.
+   ===================================================================== */
+var MSG_NONE="주간충현 사본을 준비하고 있습니다.<br>잠시 후 다시 열어 주세요.<br>급하시면 오른쪽 위 '원본'을 눌러 주세요."; /* 사본이 아직 없을 때 안내 */
+var MSG_FAIL="내용을 불러오지 못했습니다.<br>인터넷 연결을 확인하고 다시 열어 주세요."; /* 인터넷이 안 될 때 안내 */
+
+var wrap=document.getElementById("wrap");
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})} /* 글자를 안전하게 화면에 넣기 위한 처리 — 수정 금지 */
+
+function show(d){
+ if(!d||!d.pages||!d.pages.length){wrap.innerHTML='<div class="msg">'+MSG_NONE+'</div>';return}
+ document.getElementById("title").textContent=d.title||"주간충현";
+ document.title=d.title||"주간충현";
+ if(/^https?:\/\//.test(d.source||""))document.getElementById("orig").href=d.source; /* 원본 링크를 이번 호 주소로 맞춤 */
+ var v=encodeURIComponent(d.number||"")+"-"+encodeURIComponent(d.updated||""); /* 새 호가 올라오면 이전 그림 대신 새 그림을 받도록 붙이는 꼬리표 */
+ var n=d.pages.length,h="";
+ d.pages.forEach(function(p,i){
+  /* 첫 두 쪽은 바로, 나머지는 스크롤해서 가까워지면 불러옵니다(loading=lazy) → 처음 화면이 빨리 뜸 */
+  h+='<div class="cap">'+(i+1)+' / '+n+'쪽</div>'
+   +'<img class="pg" src="'+esc(p.src)+'?v='+v+'" alt="'+(i+1)+'쪽"'
+   +(p.w&&p.h?' width="'+p.w+'" height="'+p.h+'"':'')   /* 크기를 미리 알려 두면 그림이 뜰 때 화면이 덜컹거리지 않음 */
+   +(i>1?' loading="lazy"':'')+'>';
+ });
+ h+='<div class="sub">'+(d.updated?'사본 갱신: '+esc(d.updated):'')+'</div>';
+ wrap.innerHTML=h;
+}
+
+/* data.json(호 정보)을 읽어 옵니다. cache:"no-store" = 항상 최신 정보를 받음 */
+fetch("data.json?t="+Date.now(),{cache:"no-store"})
+ .then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error(r.status);return r.json()})
+ .then(show)
+ .catch(function(){wrap.innerHTML='<div class="msg">'+MSG_FAIL+'</div>'});
+
+/* 맨 위로 가는 버튼: 조금 내려가면 나타남 */
+var topBtn=document.getElementById("top");
+window.addEventListener("scroll",function(){topBtn.style.display=window.scrollY>600?"block":"none"});
+topBtn.addEventListener("click",function(){window.scrollTo({top:0,behavior:"smooth"})});
+</script>
+</body>
+</html>
